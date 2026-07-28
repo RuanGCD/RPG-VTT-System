@@ -114,7 +114,7 @@ function App() {
 
 </section>
 </section>
-<button onClick={salvarComoImagem}>
+<button className="Salvar-imagem" onClick={salvarComoImagem}>
     Salvar como PNG
 </button>
     </>
