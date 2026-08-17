@@ -1,0 +1,649 @@
+.sala-container {
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  width: 100vw;
+  height: 100vh;
+  max-width: 100% !important;
+  margin: 0;
+  padding: 10px;
+  box-sizing: border-box;
+  overflow: hidden;
+}
+
+.sala-header {
+  background: #1e1e1e;
+  padding: 10px 15px;
+  border-radius: 8px;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  border: 1px solid #333;
+  flex-shrink: 0;
+}
+
+.codigo-destaque {
+  color: #00e5ff;
+  letter-spacing: 2px;
+}
+
+.btn-sair-sala, .btn-excluir-sala {
+  padding: 6px 12px;
+  border-radius: 4px;
+  border: none;
+  cursor: pointer;
+  color: white;
+  font-size: 12px;
+}
+
+.btn-sair-sala { background: #555; }
+.btn-excluir-sala { background: #ef4444; margin-right: 5px; }
+
+.sala-grid {
+  display: grid;
+  grid-template-columns: 1fr 320px;
+  gap: 12px;
+  flex: 1;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.area-mapa {
+  background: #141414;
+  border: 2px solid #333;
+  border-radius: 8px;
+  display: flex;
+  flex-direction: column;
+  padding: 10px;
+  height: 100%;
+  width: 100%;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.painel-controles-mapa {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 10px;
+  flex-shrink: 0;
+  z-index: 10;
+}
+
+.controles-zoom-flutuantes {
+  display: flex;
+  gap: 5px;
+  position: absolute;
+  top: 10px;
+  left: 10px;
+  z-index: 20;
+}
+
+.viewport-mapa-container {
+  flex: 1;
+  width: 100%;
+  height: 100%;
+  position: relative;
+  overflow: hidden;
+  border: 1px dashed #444;
+  border-radius: 6px;
+}
+
+.viewport-mapa {
+  width: 100%;
+  height: 100%;
+  background-size: contain;
+  background-position: center;
+  background-repeat: no-repeat;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
+.placeholder-mapa {
+  color: #666;
+  font-size: 14px;
+  text-align: center;
+  padding: 20px;
+}
+
+.area-lateral {
+  width: 320px;
+  height: 100%;
+  display: flex;
+  flex-direction: column;
+  gap: 10px;
+  min-height: 0;
+}
+
+.painel-recursos {
+  background: #1e1e1e;
+  border: 2px solid #333;
+  border-radius: 8px;
+  padding: 10px;
+  display: flex;
+  flex-direction: column;
+  flex: 0 0 auto;
+}
+
+.abas-recursos {
+  display: flex;
+  gap: 5px;
+  margin-bottom: 8px;
+}
+
+.abas-recursos button {
+  flex: 1;
+  padding: 6px;
+  background: #2b2b2b;
+  border: none;
+  color: #aaa;
+  cursor: pointer;
+  border-radius: 4px;
+  font-size: 12px;
+}
+
+.abas-recursos button.ativa {
+  background: #0288d1;
+  color: #fff;
+}
+
+.galeria-recursos {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 5px;
+  max-height: 120px;
+  overflow-y: auto;
+  padding-right: 5px;
+}
+
+.item-galeria img {
+  width: 100%;
+  height: 50px;
+  object-fit: cover;
+  border-radius: 4px;
+  cursor: pointer;
+  border: 1px solid #444;
+}
+
+.painel-ficha-rapida {
+  background: #1e1e1e;
+  border: 2px solid #333;
+  border-radius: 8px;
+  padding: 10px;
+  flex-shrink: 0;
+}
+
+.painel-ficha-rapida h3 { font-size: 16px; margin-bottom: 8px; text-align: center; }
+
+.controles-rolagem-rapida {
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
+}
+
+.controles-rolagem-rapida select {
+  padding: 6px;
+  background: #111;
+  border: 1px solid #444;
+  color: #fff;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.btn-upload-recurso {
+  display: block;
+  text-align: center;
+  background: #22c55e;
+  color: #fff;
+  padding: 8px 12px;
+  border-radius: 6px;
+  cursor: pointer;
+  font-weight: bold;
+  font-size: 12px;
+  margin: 10px 0; /* Garante o espaçamento em cima e embaixo do botão */
+  box-sizing: border-box;
+}
+
+.btn-upload-recurso:hover {
+  background: #16a34a;
+}
+
+/* Espaçamento e rolagem da galeria */
+.galeria-recursos {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+  max-height: 140px;
+  overflow-y: auto;
+  padding-right: 5px;
+  margin-top: 10px; /* Garante que os itens fiquem estritamente abaixo do botão */
+}
+
+.btn-rolar-sala {
+  padding: 8px;
+  background: #2e7d32;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+  font-weight: bold;
+}
+
+.painel-chat {
+  background: #1e1e1e;
+  border: 2px solid #333;
+  border-radius: 8px;
+  padding: 10px;
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  min-height: 0;
+}
+
+.painel-chat h3 { font-size: 16px; margin-bottom: 8px; text-align: center; }
+
+.historico-chat {
+  flex: 1;
+  background: #111;
+  border: 1px solid #333;
+  border-radius: 4px;
+  padding: 8px;
+  overflow-y: auto;
+  margin-bottom: 8px;
+  font-size: 13px;
+}
+
+.form-chat {
+  display: flex;
+  gap: 5px;
+  flex-shrink: 0;
+}
+
+.form-chat input {
+  flex: 1;
+  padding: 8px;
+  background: #222;
+  border: 1px solid #444;
+  color: #fff;
+  border-radius: 4px;
+}
+
+.form-chat button {
+  padding: 0 15px;
+  background: #0288d1;
+  color: white;
+  border: none;
+  border-radius: 4px;
+  cursor: pointer;
+}
+
+/* ==========================================================================
+   ESTILOS DO LOBBY (GLOBAIS - DESKTOP E MOBILE)
+   ========================================================================== */
+
+.container-lobby {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: calc(100vh - 70px);
+  padding: 20px;
+  box-sizing: border-box;
+  width: 100%;
+}
+
+.box-lobby {
+  background: #18181b;
+  border: 1px solid #27272a;
+  border-radius: 12px;
+  padding: 32px 24px;
+  width: 100%;
+  max-width: 440px;
+  box-shadow: 0 10px 25px rgba(0, 0, 0, 0.5);
+  text-align: center;
+}
+
+.box-lobby h2 {
+  margin: 0 0 6px 0;
+  color: #f4f4f5;
+  font-size: 1.5rem;
+  font-weight: 700;
+}
+
+.subtitulo-lobby {
+  color: #a1a1aa;
+  font-size: 0.875rem;
+  margin-bottom: 24px;
+}
+
+.btn-criar-lobby {
+  width: 100%;
+  padding: 12px 16px;
+  background-color: #16a34a;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  font-size: 0.95rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.btn-criar-lobby:hover {
+  background-color: #15803d;
+}
+
+.divisor-lobby {
+  display: flex;
+  align-items: center;
+  text-align: center;
+  margin: 20px 0;
+  color: #71717a;
+  font-size: 0.8rem;
+}
+
+.divisor-lobby::before,
+.divisor-lobby::after {
+  content: '';
+  flex: 1;
+  border-bottom: 1px solid #27272a;
+}
+
+.divisor-lobby span {
+  padding: 0 10px;
+}
+
+.form-entrar-lobby {
+  display: flex;
+  gap: 8px;
+}
+
+.form-entrar-lobby input {
+  flex: 1;
+  background-color: #09090b;
+  border: 1px solid #3f3f46;
+  border-radius: 8px;
+  padding: 10px 14px;
+  color: #ffffff;
+  font-size: 0.95rem;
+  text-transform: uppercase;
+  outline: none;
+}
+
+.form-entrar-lobby input:focus {
+  border-color: #00d2ff;
+}
+
+.form-entrar-lobby button {
+  padding: 10px 18px;
+  background-color: #0284c7;
+  color: #ffffff;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+
+.form-entrar-lobby button:hover {
+  background-color: #0369a1;
+}
+
+.historico-lobby {
+  margin-top: 28px;
+  text-align: left;
+  border-top: 1px solid #27272a;
+  padding-top: 16px;
+}
+
+.grupo-historico h3 {
+  font-size: 0.8rem;
+  color: #a1a1aa;
+  text-transform: uppercase;
+  letter-spacing: 0.05em;
+  margin-bottom: 10px;
+}
+
+.lista-cards-sala {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 16px;
+}
+
+.card-sala {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  background-color: #09090b;
+  border: 1px solid #27272a;
+  border-radius: 6px;
+  padding: 8px 12px;
+}
+
+.cod-sala {
+  font-family: monospace;
+  font-weight: bold;
+  color: #00d2ff;
+  letter-spacing: 1px;
+}
+
+.acoes-card {
+  display: flex;
+  gap: 6px;
+}
+
+.btn-entrar-card {
+  background: #27272a;
+  color: #fff;
+  border: none;
+  padding: 4px 10px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+.btn-entrar-card:hover {
+  background: #3f3f46;
+}
+
+.btn-excluir-card {
+  background: #ef4444;
+  color: #fff;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 0.8rem;
+}
+
+/* ==========================================================================
+   AJUSTES RESPONSIVOS MOBILE
+   ========================================================================== */
+
+@media (max-width: 768px) {
+  .sala-container {
+    padding: 5px;
+    gap: 5px;
+    overflow: hidden;
+  }
+
+  .sala-header {
+    padding: 8px;
+    flex-wrap: wrap;
+    gap: 5px;
+  }
+
+  .sala-header h2 {
+    font-size: 14px;
+    width: 100%;
+    text-align: center;
+    margin-bottom: 5px;
+  }
+
+  .sala-header div {
+    width: 100%;
+    justify-content: center;
+  }
+
+  .btn-sair-sala, .btn-excluir-sala {
+    padding: 5px 10px;
+    font-size: 11px;
+    flex: 1;
+    text-align: center;
+  }
+
+  .sala-grid {
+    display: flex;
+    flex-direction: column;
+    height: calc(100vh - 85px);
+    position: relative;
+    gap: 0;
+  }
+
+  .area-mapa {
+    position: absolute;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    padding: 0;
+    border: none;
+    border-radius: 0;
+    z-index: 1;
+  }
+
+  .painel-controles-mapa {
+    position: absolute;
+    top: 10px;
+    left: 10px;
+    flex-direction: column;
+    gap: 5px;
+    margin: 0;
+    z-index: 10;
+  }
+
+  .painel-controles-mapa .btn-upload {
+    padding: 5px 10px;
+    font-size: 11px;
+    background: rgba(30, 30, 30, 0.8);
+    border: 1px solid #444;
+  }
+
+  .viewport-mapa-container {
+    border: none;
+    border-radius: 0;
+  }
+
+  .placeholder-mapa {
+    font-size: 12px;
+    background: rgba(0,0,0,0.5);
+    border-radius: 4px;
+  }
+
+  .area-lateral {
+    position: absolute;
+    bottom: 0;
+    left: 0;
+    width: 100%;
+    height: auto;
+    max-height: 80vh;
+    background: rgba(20, 20, 20, 0.9);
+    border-top: 2px solid #333;
+    border-radius: 12px 12px 0 0;
+    z-index: 50;
+    gap: 5px;
+    padding: 10px 5px 60px 5px;
+    transform: translateY(calc(100% - 110px));
+    transition: transform 0.3s ease-out;
+    box-shadow: 0 -5px 15px rgba(0,0,0,0.5);
+  }
+
+  .area-lateral.aberta {
+    transform: translateY(0);
+  }
+
+  .area-lateral::before {
+    content: '';
+    position: absolute;
+    top: 5px;
+    left: 50%;
+    transform: translateX(-50%);
+    width: 40px;
+    height: 4px;
+    background: #555;
+    border-radius: 2px;
+  }
+
+  .painel-recursos {
+    border: none;
+    background: transparent;
+    padding: 0 5px;
+    margin-top: 15px;
+  }
+
+  .abas-recursos button {
+    padding: 8px 5px;
+    font-size: 11px;
+  }
+
+  .galeria-recursos {
+    grid-template-columns: repeat(4, 1fr);
+    max-height: 100px;
+  }
+
+  .item-galeria img {
+    height: 45px;
+  }
+
+  .painel-ficha-rapida {
+    border: none;
+    background: rgba(30, 30, 30, 0.5);
+    padding: 8px;
+    margin-bottom: 5px;
+    cursor: pointer;
+  }
+
+  .painel-ficha-rapida h3 { font-size: 14px; margin-bottom: 5px; }
+
+  .controles-rolagem-rapida {
+    flex-direction: row;
+    flex-wrap: wrap;
+  }
+
+  .controles-rolagem-rapida select, .btn-rolar-sala {
+    flex: 1;
+    font-size: 11px;
+    padding: 6px 3px;
+  }
+
+  .painel-chat {
+    border: none;
+    background: transparent;
+    padding: 0 5px;
+    height: 250px;
+    flex: none;
+  }
+
+  .painel-chat h3 { font-size: 14px; margin-bottom: 5px; }
+
+  .historico-chat {
+    font-size: 12px;
+    background: rgba(10, 10, 10, 0.8);
+  }
+
+  .area-lateral .form-chat {
+    position: absolute;
+    bottom: 5px;
+    left: 5px;
+    width: calc(100% - 10px);
+    background: #1e1e1e;
+    padding: 5px;
+    border-radius: 8px;
+    border: 1px solid #333;
+    z-index: 60;
+  }
+
+  .form-chat input {
+    padding: 10px;
+    font-size: 13px;
+  }
+}
