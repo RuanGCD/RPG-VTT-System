@@ -6,11 +6,13 @@ import {
   deletarSalaDoBanco,
   uploadArquivoStorage,
   salvarRecursoNoBanco,
-  limparRecursosDaSala
+  limparRecursosDaSala,
+  carregarMensagensDaSala,
+  enviarMensagemNoBanco,
+  clientAppwrite
 } from '../services/vttservice';
 import './SalaVirtual.css';
 
-// Configuração da escala de grid (16.5px por padrão = 1.5 metros por quadrado)
 const TAMANHO_CELULA = 16.5; 
 const METROS_POR_CELULA = 1.5;
 
@@ -19,37 +21,25 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
   const [documentIdSala, setDocumentIdSala] = useState(null);
   const [carregando, setCarregando] = useState(false);
 
-  // Histórico local de salas salvas
   const [salasCriadas, setSalasCriadas] = useState([]);
   const [salasEntradas, setSalasEntradas] = useState([]);
 
-  // Estado do mapa e elementos de exibição
   const [mapaFundo, setMapaFundo] = useState('');
   const [tokensNoMapa, setTokensNoMapa] = useState([]);
   const [folhetoEmExibicao, setFolhetoEmExibicao] = useState(null);
 
-  // Estado de zoom e pan (arraste) do mapa
   const [zoomMapa, setZoomMapa] = useState(1);
   const [posicao, setPosicao] = useState({ x: 0, y: 0 });
   const [arrastando, setArrastando] = useState(false);
   const pontoInicioRef = useRef({ x: 0, y: 0 });
 
-  // Estado de arraste do Token com Régua de Medição (Estilo Roll20)
   const [tokenArrastando, setTokenArrastando] = useState(null);
   const viewportRef = useRef(null);
 
-  // Aba selecionada e listas de recursos
   const [abaRecursos, setAbaRecursos] = useState('tokens');
-  const [recursos, setRecursos] = useState({
-    tokens: [],
-    folhetos: [],
-    mapas: []
-  });
+  const [recursos, setRecursos] = useState({ tokens: [], folhetos: [], mapas: [] });
 
-  // Mensagens do chat e dados de fichas
-  const [mensagens, setMensagens] = useState([
-    { autor: 'Sistema', texto: 'Bem-vindo à sala virtual!', tipo: 'sistema' }
-  ]);
+  const [mensagens, setMensagens] = useState([]);
   const [textoMsg, setTextoMsg] = useState('');
   const [listaFichas, setListaFichas] = useState([]);
   const [fichaSelecionadaIndex, setFichaSelecionadaIndex] = useState(0);
@@ -57,7 +47,6 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
   const [atributoSelecionado, setAtributoSelecionado] = useState('');
   const [modoVantagem, setModoVantagem] = useState('normal');
 
-  // Estado para controlar a gaveta lateral no Mobile
   const [gavetaAberta, setGavetaAberta] = useState(false);
 
   useEffect(() => {
@@ -72,18 +61,18 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
     }
   }, []);
 
+  // --- CARREGAMENTO INICIAL DA SALA E MENSAGENS ---
   useEffect(() => {
     if (!salaAtiva) {
       setDocumentIdSala(null);
       setMapaFundo('');
       setTokensNoMapa([]);
       setRecursos({ tokens: [], folhetos: [], mapas: [] });
-      setZoomMapa(1);
-      setPosicao({ x: 0, y: 0 });
+      setMensagens([]);
       return;
     }
 
-    const sincronizarComBanco = async () => {
+    const inicializarSala = async () => {
       setCarregando(true);
       try {
         const salaDoc = await carregarDadosDaSala(salaAtiva);
@@ -94,7 +83,7 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
           if (salaDoc.tokens) {
             try { 
               const tokensCarregados = JSON.parse(salaDoc.tokens);
-              setTokensNoMapa(tokensCarregados.map(t => ({ ...t, tamanho: t.tamanho || 50 })));
+              setTokensNoMapa(tokensCarregados);
             } catch { 
               setTokensNoMapa([]); 
             }
@@ -105,6 +94,11 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
             folhetos: Array.isArray(salaDoc.recursos_folhetos) ? salaDoc.recursos_folhetos : [],
             mapas: Array.isArray(salaDoc.recursos_mapas) ? salaDoc.recursos_mapas : []
           });
+
+          // Carregar histórico de mensagens persistido
+          const msgsIniciais = await carregarMensagensDaSala(salaAtiva);
+          setMensagens(msgsIniciais);
+
         } else {
           alert(`Sala ${salaAtiva} não foi encontrada.`);
           removerSalaDoHistorico(salaAtiva);
@@ -117,13 +111,64 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
       }
     };
 
-    sincronizarComBanco();
+    inicializarSala();
   }, [salaAtiva]);
 
+  // --- ESCUTAR SINCRONIZAÇÃO EM TEMPO REAL (APPWRITE REALTIME) ---
+  useEffect(() => {
+    if (!documentIdSala || !salaAtiva) return;
+
+    // Inscrição nas alterações do documento da sala e na coleção de mensagens
+    const unsubscribe = clientAppwrite.subscribe(
+      [
+        `databases.6a7e41b20037ce22279c.collections.salas.documents.${documentIdSala}`,
+        `databases.6a7e41b20037ce22279c.collections.mensagens.documents`
+      ],
+      (response) => {
+        // Evento referente à alteração do estado do Mapa/Tokens/Recursos
+        if (response.channels.some(c => c.includes(documentIdSala))) {
+          const payload = response.payload;
+          
+          if (payload.mapa_url !== undefined) setMapaFundo(payload.mapa_url);
+
+          if (payload.tokens !== undefined) {
+            try {
+              const novosTokens = JSON.parse(payload.tokens);
+              // Atualiza apenas se não estiver arrastando localmente para evitar trepidação
+              setTokensNoMapa(novosTokens);
+            } catch (e) {
+              console.error("Erro ao processar tokens recebidos em tempo real", e);
+            }
+          }
+
+          setRecursos({
+            tokens: Array.isArray(payload.recursos_tokens) ? payload.recursos_tokens : [],
+            folhetos: Array.isArray(payload.recursos_folhetos) ? payload.recursos_folhetos : [],
+            mapas: Array.isArray(payload.recursos_mapas) ? payload.recursos_mapas : []
+          });
+        }
+
+        // Evento referente a uma nova mensagem recebida no Chat
+        if (response.channels.some(c => c.includes('mensagens'))) {
+          const novaMsg = response.payload;
+          if (novaMsg.sala_id === salaAtiva) {
+            setMensagens(prev => {
+              if (prev.some(m => m.$id === novaMsg.$id)) return prev;
+              return [...prev, novaMsg];
+            });
+          }
+        }
+      }
+    );
+
+    return () => {
+      unsubscribe();
+    };
+  }, [documentIdSala, salaAtiva]);
+
+  // --- HANDLERS DO MAPA E TOKENS ---
   const toggleGaveta = () => {
-    if (window.innerWidth <= 768) {
-      setGavetaAberta(!gavetaAberta);
-    }
+    if (window.innerWidth <= 768) setGavetaAberta(!gavetaAberta);
   };
 
   const handleZoomIn = () => setZoomMapa(prev => Math.min(prev + 0.2, 4));
@@ -133,38 +178,25 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
     setPosicao({ x: 0, y: 0 });
   };
 
-  // Zoom via Scroll do Mouse
   const handleWheel = (e) => {
     e.preventDefault();
     const sensibilidade = 0.0015;
     const delta = -e.deltaY * sensibilidade;
-
-    setZoomMapa((zoomAtual) => {
-      const novoZoom = zoomAtual + delta;
-      return Math.min(Math.max(novoZoom, 0.4), 4);
-    });
+    setZoomMapa((zoomAtual) => Math.min(Math.max(zoomAtual + delta, 0.4), 4));
   };
 
-  // Arraste do Mapa APENAS com Botão Direito (e.button === 2)
   const handleMouseDown = (e) => {
-    if (e.button !== 2) return; // Permite arrastar somente com o botão direito
-    if (e.target.closest('.token-wrapper') || e.target.closest('.token-controles')) {
-      return;
-    }
+    if (e.button !== 2) return;
+    if (e.target.closest('.token-wrapper') || e.target.closest('.token-controles')) return;
 
     if (gavetaAberta) setGavetaAberta(false);
-
     setArrastando(true);
-    pontoInicioRef.current = {
-      x: e.clientX - posicao.x,
-      y: e.clientY - posicao.y
-    };
+    pontoInicioRef.current = { x: e.clientX - posicao.x, y: e.clientY - posicao.y };
   };
 
   const handleMouseMove = (e) => {
     if (tokenArrastando && viewportRef.current) {
       const rect = viewportRef.current.getBoundingClientRect();
-
       const mouseXNoMapa = (e.clientX - rect.left - posicao.x) / zoomMapa;
       const mouseYNoMapa = (e.clientY - rect.top - posicao.y) / zoomMapa;
 
@@ -179,7 +211,6 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
       const deltaX = centroAtualX - centroOrigemX;
       const deltaY = centroAtualY - centroOrigemY;
       const distanciaPx = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-
       const distanciaQuadrados = distanciaPx / TAMANHO_CELULA;
       const distanciaMetros = distanciaQuadrados * METROS_POR_CELULA;
 
@@ -191,39 +222,32 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
         distanciaQuadrados: distanciaQuadrados.toFixed(1)
       }));
 
-      setTokensNoMapa(prev => prev.map(t => {
-        if (t.id === tokenArrastando.id) {
-          return { ...t, x: Math.round(novoX), y: Math.round(novoY) };
-        }
-        return t;
-      }));
+      setTokensNoMapa(prev => prev.map(t => t.id === tokenArrastando.id ? { ...t, x: Math.round(novoX), y: Math.round(novoY) } : t));
       return;
     }
 
     if (arrastando) {
-      setPosicao({
-        x: e.clientX - pontoInicioRef.current.x,
-        y: e.clientY - pontoInicioRef.current.y
-      });
+      setPosicao({ x: e.clientX - pontoInicioRef.current.x, y: e.clientY - pontoInicioRef.current.y });
     }
   };
 
   const handleMouseUp = async (e) => {
-    if (tokenArrastando) {
-      setTokenArrastando(null);
-      if (documentIdSala) {
-        await atualizarEstadoDaSala(documentIdSala, { tokens: JSON.stringify(tokensNoMapa) });
-      }
+  if (tokenArrastando) {
+    setTokenArrastando(null);
+    if (documentIdSala) {
+      // Envia o estado atualizado dos tokens para o Appwrite
+      setTokensNoMapa((tokensAtuais) => {
+        atualizarEstadoDaSala(documentIdSala, { tokens: JSON.stringify(tokensAtuais) });
+        return tokensAtuais;
+      });
     }
-    
-    if (e?.button === 2 || arrastando) {
-      setArrastando(false);
-    }
-  };
+  }
+  if (e?.button === 2 || arrastando) setArrastando(false);
+};
 
   const handleTokenMouseDown = (e, token) => {
     e.stopPropagation();
-    if (e.button !== 0) return; // Arraste de tokens continua com Botão Esquerdo
+    if (e.button !== 0) return;
 
     const rect = viewportRef.current.getBoundingClientRect();
     const tamanho = token.tamanho || 50;
@@ -298,11 +322,7 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
     try {
       const { fileId, url } = await uploadArquivoStorage(file);
 
-      if (!url) {
-        throw new Error("Não foi possível obter a URL do arquivo enviado.");
-      }
-
-      const novoMapaDoc = await salvarRecursoNoBanco('MAPAS', {
+      await salvarRecursoNoBanco('MAPAS', {
         sala_id: salaAtiva,
         nome: file.name,
         imagem_url: String(url),
@@ -316,10 +336,8 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
 
       await atualizarEstadoDaSala(documentIdSala, {
         mapa_url: url,
-        mapa_ativo_id: novoMapaDoc.$id,
         recursos_mapas: novosMapas
       });
-
     } catch (err) {
       console.error("Erro no upload do mapa:", err);
       alert("Erro ao enviar o mapa.");
@@ -348,9 +366,7 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
       setRecursos(prev => ({ ...prev, [abaRecursos]: novaLista }));
 
       const campoSala = `recursos_${abaRecursos}`;
-      await atualizarEstadoDaSala(documentIdSala, {
-        [campoSala]: novaLista
-      });
+      await atualizarEstadoDaSala(documentIdSala, { [campoSala]: novaLista });
     } catch (err) {
       console.error(`Erro no upload de ${abaRecursos}:`, err);
       alert(`Erro ao enviar o recurso.`);
@@ -432,19 +448,24 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
     setSalaAtiva(cod);
   };
 
-  const enviarMensagem = (e) => {
+  // ENVIO E PERSISTÊNCIA DAS MENSAGENS E ROLAGENS NO CHAT 
+  const enviarMensagem = async (e) => {
     e.preventDefault();
-    if (!textoMsg.trim()) return;
-    setMensagens(prev => [...prev, {
+    if (!textoMsg.trim() || !salaAtiva) return;
+
+    const novaMensagem = {
+      sala_id: salaAtiva,
       autor: usuario?.name || usuario?.email || 'Jogador',
       texto: textoMsg,
       tipo: 'chat'
-    }]);
+    };
+
     setTextoMsg('');
+    await enviarMensagemNoBanco(novaMensagem);
   };
 
-  const rolarDadoEEnviar = () => {
-    if (!atributoSelecionado || !fichaAtiva) return alert("Selecione ficha e atributo!");
+  const rolarDadoEEnviar = async () => {
+    if (!atributoSelecionado || !fichaAtiva || !salaAtiva) return alert("Selecione ficha e atributo!");
     const valorBase = Number(fichaAtiva.atributos?.[atributoSelecionado]) || 10;
     const mod = Math.floor((valorBase - 10) / 2) + 1;
     let d1 = Math.floor(Math.random() * 20) + 1;
@@ -453,11 +474,14 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
     if (modoVantagem === 'vantagem') dado = Math.max(d1, d2);
     if (modoVantagem === 'desvantagem') dado = Math.min(d1, d2);
 
-    setMensagens(prev => [...prev, {
+    const mensagemRolagem = {
+      sala_id: salaAtiva,
       autor: fichaAtiva.jogador || 'Personagem',
       texto: `Rolou ${atributoSelecionado}: d20 (${dado}) + mod (${mod > 0 ? '+' + mod : mod}) = Total: ${dado + mod}`,
       tipo: 'rolagem'
-    }]);
+    };
+
+    await enviarMensagemNoBanco(mensagemRolagem);
   };
 
   if (!salaAtiva) {
@@ -771,7 +795,7 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
             <h3>Chat</h3>
             <div className="historico-chat">
               {mensagens.map((msg, idx) => (
-                <div key={idx} className={`mensagem ${msg.tipo}`}>
+                <div key={msg.$id || idx} className={`mensagem ${msg.tipo}`}>
                   <strong>{msg.autor}: </strong><span>{msg.texto}</span>
                 </div>
               ))}

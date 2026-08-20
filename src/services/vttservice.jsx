@@ -14,13 +14,43 @@ const COLLECTIONS = {
   SALAS: 'salas',
   MAPAS: 'mapas',
   TOKENS: 'tokens',
-  FOLHETOS: 'folhetos'
+  FOLHETOS: 'folhetos',
+  MENSAGENS: 'mensagens'
 };
+
+export const clientAppwrite = client;
 
 const extrairFileIdDaUrl = (url) => {
   if (!url || typeof url !== 'string') return null;
   const match = url.match(/\/files\/([a-zA-Z0-9._-]+)(?:[\/?]|$)/);
   return match ? match[1] : null;
+};
+
+export const carregarMensagensDaSala = async (codigoSala) => {
+  try {
+    const res = await databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.MENSAGENS,
+      [
+        Query.equal('sala_id', codigoSala),
+        Query.orderAsc('$createdAt'),
+        Query.limit(100)
+      ]
+    );
+    return res.documents;
+  } catch (err) {
+    console.error("Erro ao carregar mensagens:", err);
+    return [];
+  }
+};
+
+export const enviarMensagemNoBanco = async (dadosMensagem) => {
+  return await databases.createDocument(
+    DATABASE_ID,
+    COLLECTIONS.MENSAGENS,
+    ID.unique(),
+    dadosMensagem
+  );
 };
 
 export const uploadArquivoStorage = async (file) => {
@@ -66,13 +96,18 @@ export const deletarSalaDoBanco = async (documentId) => {
   );
 };
 
-export const carregarDadosDaSala = async (codigo) => {
-  const res = await databases.listDocuments(
-    DATABASE_ID,
-    COLLECTIONS.SALAS,
-    [Query.equal('codigo', codigo)]
-  );
-  return res.documents[0] || null;
+export const carregarDadosDaSala = async (codigoSala) => {
+  try {
+    const res = await databases.listDocuments(
+      DATABASE_ID,
+      COLLECTIONS.SALAS,
+      [Query.equal('codigo', codigoSala)]
+    );
+    return res.documents[0] || null;
+  } catch (err) {
+    console.error("Erro ao buscar sala:", err);
+    return null;
+  }
 };
 
 export const criarSalaNoAppwrite = async (codigo, mestreId) => {
@@ -83,6 +118,7 @@ export const criarSalaNoAppwrite = async (codigo, mestreId) => {
     {
       codigo: codigo,
       mestre_id: mestreId,
+      tokens: JSON.stringify([]),
       recursos_mapas: [],
       recursos_tokens: [],
       recursos_folhetos: []
