@@ -25,7 +25,6 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
   const [salasEntradas, setSalasEntradas] = useState([]);
 
   const [mapaFundo, setMapaFundo] = useState('');
-  const [dimensoesMapa, setDimensoesMapa] = useState({ largura: 1000, altura: 1000 });
   const [tokensNoMapa, setTokensNoMapa] = useState([]);
   const [folhetoEmExibicao, setFolhetoEmExibicao] = useState(null);
 
@@ -36,6 +35,7 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
 
   const [tokenArrastando, setTokenArrastando] = useState(null);
   const viewportRef = useRef(null);
+  const imgMapaRef = useRef(null);
 
   const [abaRecursos, setAbaRecursos] = useState('tokens');
   const [recursos, setRecursos] = useState({ tokens: [], folhetos: [], mapas: [] });
@@ -50,39 +50,6 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
 
   const [gavetaAberta, setGavetaAberta] = useState(false);
 
-  // EFETUAR A LEITURA DO TAMANHO REAL DA IMAGEM DO MAPA
-  useEffect(() => {
-    if (!mapaFundo) return;
-    
-    const img = new Image();
-    img.src = mapaFundo;
-    img.onload = () => {
-      setDimensoesMapa({
-        largura: img.naturalWidth || 1000,
-        altura: img.naturalHeight || 1000
-      });
-    };
-  }, [mapaFundo]);
-
-  // CORREÇÃO DO EVENTO DE WHEEL PASSIVO (REMOVE O AVISO DO CONSOLE)
-  useEffect(() => {
-    const container = viewportRef.current;
-    if (!container) return;
-
-    const handleWheelPrevent = (e) => {
-      e.preventDefault();
-      const sensibilidade = 0.0015;
-      const delta = -e.deltaY * sensibilidade;
-      setZoomMapa((zoomAtual) => Math.min(Math.max(zoomAtual + delta, 0.4), 4));
-    };
-
-    container.addEventListener('wheel', handleWheelPrevent, { passive: false });
-
-    return () => {
-      container.removeEventListener('wheel', handleWheelPrevent);
-    };
-  }, []);
-
   useEffect(() => {
     setSalasCriadas(JSON.parse(localStorage.getItem('vtt_salas_criadas')) || []);
     setSalasEntradas(JSON.parse(localStorage.getItem('vtt_salas_entradas')) || []);
@@ -95,7 +62,7 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
     }
   }, []);
 
-  // CARREGAMENTO INICIAL DA SALA E MENSAGENS
+  // CARREGAMENTO INICIAL DA SALA E MENSAGENS 
   useEffect(() => {
     if (!salaAtiva) {
       setDocumentIdSala(null);
@@ -129,6 +96,7 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
             mapas: Array.isArray(salaDoc.recursos_mapas) ? salaDoc.recursos_mapas : []
           });
 
+          // Carregar histórico de mensagens persistido
           const msgsIniciais = await carregarMensagensDaSala(salaAtiva);
           setMensagens(msgsIniciais);
 
@@ -147,7 +115,7 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
     inicializarSala();
   }, [salaAtiva]);
 
-  // ESCUTAR SINCRONIZAÇÃO EM TEMPO REAL (APPWRITE REALTIME)
+  // ESCUTAR SINCRONIZAÇÃO EM TEMPO REAL (APPWRITE REALTIME) 
   useEffect(() => {
     if (!documentIdSala || !salaAtiva) return;
 
@@ -165,7 +133,8 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
           if (payload.tokens !== undefined) {
             try {
               const novosTokens = JSON.parse(payload.tokens);
-              setTokensNoMapa(novosTokens);
+              // Atualiza apenas se o usuário local não estiver arrastando no momento
+              setTokensNoMapa(prev => tokenArrastando ? prev : novosTokens);
             } catch (e) {
               console.error("Erro ao processar tokens recebidos em tempo real", e);
             }
@@ -193,9 +162,9 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
     return () => {
       unsubscribe();
     };
-  }, [documentIdSala, salaAtiva]);
+  }, [documentIdSala, salaAtiva, tokenArrastando]);
 
-  // HANDLERS DO MAPA E TOKENS
+  // CONTROLES DE NAVEGAÇÃO / PAN E ZOOM
   const toggleGaveta = () => {
     if (window.innerWidth <= 768) setGavetaAberta(!gavetaAberta);
   };
@@ -207,8 +176,15 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
     setPosicao({ x: 0, y: 0 });
   };
 
+  const handleWheel = (e) => {
+    e.preventDefault();
+    const sensibilidade = 0.0015;
+    const delta = -e.deltaY * sensibilidade;
+    setZoomMapa((zoomAtual) => Math.min(Math.max(zoomAtual + delta, 0.4), 4));
+  };
+
   const handleMouseDown = (e) => {
-    if (e.button !== 2) return;
+    if (e.button !== 2) return; // Apenas botão direito arrasta a câmera
     if (e.target.closest('.token-wrapper') || e.target.closest('.token-controles')) return;
 
     if (gavetaAberta) setGavetaAberta(false);
@@ -216,47 +192,52 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
     pontoInicioRef.current = { x: e.clientX - posicao.x, y: e.clientY - posicao.y };
   };
 
-  // CORREÇÃO DA EQUIVALÊNCIA DO MOUSE E ZOOM NO MOVIMENTO DO TOKEN
   const handleMouseMove = (e) => {
-    if (tokenArrastando && viewportRef.current) {
-      const mapaElemento = viewportRef.current.querySelector('.viewport-mapa');
-      const rect = mapaElemento.getBoundingClientRect();
+    if (tokenArrastando && imgMapaRef.current) {
+  const rectMapa = imgMapaRef.current.getBoundingClientRect();
 
-      const escalaX = rect.width / dimensoesMapa.largura;
-      const escalaY = rect.height / dimensoesMapa.altura;
+  // Posição do mouse relativa à imagem considerando o Zoom
+  const mouseXRelativo = (e.clientX - rectMapa.left) / zoomMapa;
+  const mouseYRelativo = (e.clientY - rectMapa.top) / zoomMapa;
 
-      // Considera o zoom atual na hora de calcular a posição do mouse em relação ao mapa base
-      const mouseXNoMapaBase = (e.clientX - rect.left) / (escalaX * zoomMapa);
-      const mouseYNoMapaBase = (e.clientY - rect.top) / (escalaY * zoomMapa);
+  const novoXPct = ((mouseXRelativo - tokenArrastando.offsetX) / (rectMapa.width / zoomMapa)) * 100;
+  const novoYPct = ((mouseYRelativo - tokenArrastando.offsetY) / (rectMapa.height / zoomMapa)) * 100;
 
-      const novoX = mouseXNoMapaBase - tokenArrastando.offsetX;
-      const novoY = mouseYNoMapaBase - tokenArrastando.offsetY;
+  // Tamanho do token em %
+  const tamanhoPct = tokenArrastando.tamanhoPct || 5;
 
-      const xLimitado = Math.max(0, Math.min(dimensoesMapa.largura - tokenArrastando.tamanho, novoX));
-      const yLimitado = Math.max(0, Math.min(dimensoesMapa.altura - tokenArrastando.tamanho, novoY));
+  // Centro de Origem e Centro Atual em Porcentagem
+  const xOrigemCentroPct = tokenArrastando.xOrigemPct + (tamanhoPct / 2);
+  const yOrigemCentroPct = tokenArrastando.yOrigemPct + (tamanhoPct / 2);
+  const xAtualCentroPct = novoXPct + (tamanhoPct / 2);
+  const yAtualCentroPct = novoYPct + (tamanhoPct / 2);
 
-      const centroOrigemX = tokenArrastando.xOrigem + tokenArrastando.tamanho / 2;
-      const centroOrigemY = tokenArrastando.yOrigem + tokenArrastando.tamanho / 2;
-      const centroAtualX = xLimitado + tokenArrastando.tamanho / 2;
-      const centroAtualY = yLimitado + tokenArrastando.tamanho / 2;
+  // Cálculo de distância em pixels reais da imagem para manter a precisão das métricas
+  const larguraMapaPx = imgMapaRef.current.naturalWidth || rectMapa.width / zoomMapa;
+  const alturaMapaPx = imgMapaRef.current.naturalHeight || rectMapa.height / zoomMapa;
 
-      const deltaX = centroAtualX - centroOrigemX;
-      const deltaY = centroAtualY - centroOrigemY;
-      const distanciaPx = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
-      const distanciaQuadrados = distanciaPx / TAMANHO_CELULA;
-      const distanciaMetros = distanciaQuadrados * METROS_POR_CELULA;
+  const deltaX = ((novoXPct - tokenArrastando.xOrigemPct) / 100) * larguraMapaPx;
+  const deltaY = ((novoYPct - tokenArrastando.yOrigemPct) / 100) * alturaMapaPx;
 
-      setTokenArrastando(prev => ({
-        ...prev,
-        xAtual: xLimitado,
-        yAtual: yLimitado,
-        distanciaMetros: distanciaMetros.toFixed(1),
-        distanciaQuadrados: distanciaQuadrados.toFixed(1)
-      }));
+  const distanciaPx = Math.sqrt(deltaX * deltaX + deltaY * deltaY);
+  const distanciaQuadrados = distanciaPx / TAMANHO_CELULA;
+  const distanciaMetros = distanciaQuadrados * METROS_POR_CELULA;
 
-      setTokensNoMapa(prev => prev.map(t => t.id === tokenArrastando.id ? { ...t, x: Math.round(xLimitado), y: Math.round(yLimitado) } : t));
-      return;
-    }
+  setTokenArrastando(prev => ({
+    ...prev,
+    xAtualPct: novoXPct,
+    yAtualPct: novoYPct,
+    xOrigemCentroPct,
+    yOrigemCentroPct,
+    xAtualCentroPct,
+    yAtualCentroPct,
+    distanciaMetros: distanciaMetros.toFixed(1),
+    distanciaQuadrados: distanciaQuadrados.toFixed(1)
+  }));
+
+  setTokensNoMapa(prev => prev.map(t => t.id === tokenArrastando.id ? { ...t, x: novoXPct, y: novoYPct } : t));
+  return;
+}
 
     if (arrastando) {
       setPosicao({ x: e.clientX - pontoInicioRef.current.x, y: e.clientY - pontoInicioRef.current.y });
@@ -265,41 +246,39 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
 
   const handleMouseUp = async (e) => {
     if (tokenArrastando) {
+      const tokensFinais = tokensNoMapa;
       setTokenArrastando(null);
       if (documentIdSala) {
-        setTokensNoMapa((tokensAtuais) => {
-          atualizarEstadoDaSala(documentIdSala, { tokens: JSON.stringify(tokensAtuais) });
-          return tokensAtuais;
-        });
+        await atualizarEstadoDaSala(documentIdSala, { tokens: JSON.stringify(tokensFinais) });
       }
     }
     if (e?.button === 2 || arrastando) setArrastando(false);
   };
 
-  // CORREÇÃO DA EQUIVALÊNCIA DO MOUSE AO CLICAR NO TOKEN COM ZOOM
   const handleTokenMouseDown = (e, token) => {
     e.stopPropagation();
-    if (e.button !== 0) return;
+    if (e.button !== 0) return; // Apenas botão esquerdo
+    if (!imgMapaRef.current) return;
 
-    const mapaElemento = viewportRef.current.querySelector('.viewport-mapa');
-    const rect = mapaElemento.getBoundingClientRect();
-    const tamanho = token.tamanho || 50;
+    const rectMapa = imgMapaRef.current.getBoundingClientRect();
+    const tokenWidthPx = (token.tamanho || 5) * (rectMapa.width / zoomMapa / 100);
 
-    const escalaX = rect.width / dimensoesMapa.largura;
-    const escalaY = rect.height / dimensoesMapa.altura;
+    const mouseXRelativo = (e.clientX - rectMapa.left) / zoomMapa;
+    const mouseYRelativo = (e.clientY - rectMapa.top) / zoomMapa;
 
-    const mouseXNoMapaBase = (e.clientX - rect.left) / (escalaX * zoomMapa);
-    const mouseYNoMapaBase = (e.clientY - rect.top) / (escalaY * zoomMapa);
+    const tokenXPx = ((token.x || 0) / 100) * (rectMapa.width / zoomMapa);
+    const tokenYPx = ((token.y || 0) / 100) * (rectMapa.height / zoomMapa);
 
     setTokenArrastando({
       id: token.id,
-      xOrigem: token.x,
-      yOrigem: token.y,
-      xAtual: token.x,
-      yAtual: token.y,
-      tamanho: tamanho,
-      offsetX: mouseXNoMapaBase - token.x,
-      offsetY: mouseYNoMapaBase - token.y,
+      xOrigemPct: token.x || 0,
+      yOrigemPct: token.y || 0,
+      xAtualPct: token.x || 0,
+      yAtualPct: token.y || 0,
+      tamanhoPct: token.tamanho || 5,
+      tamanhoPx: tokenWidthPx,
+      offsetX: mouseXRelativo - tokenXPx,
+      offsetY: mouseYRelativo - tokenYPx,
       distanciaMetros: '0.0',
       distanciaQuadrados: '0.0'
     });
@@ -309,7 +288,7 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
     e.stopPropagation();
     const novosTokens = tokensNoMapa.map(token => {
       if (token.id === idToken) {
-        const novoTamanho = Math.max(20, Math.min(250, (token.tamanho || 50) + delta));
+        const novoTamanho = Math.max(1, Math.min(30, (token.tamanho || 5) + delta));
         return { ...token, tamanho: novoTamanho };
       }
       return token;
@@ -417,14 +396,8 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
       setPosicao({ x: 0, y: 0 });
       if (documentIdSala) await atualizarEstadoDaSala(documentIdSala, { mapa_url: url });
     } else if (abaRecursos === 'tokens') {
-      const tamanhoToken = TAMANHO_CELULA * 2;
-      const novoToken = { 
-        id: Date.now(), 
-        url: url, 
-        x: (dimensoesMapa.largura / 2) - (tamanhoToken / 2), 
-        y: (dimensoesMapa.altura / 2) - (tamanhoToken / 2), 
-        tamanho: tamanhoToken 
-      };
+      // Adiciona o token centralizado usando coordenadas relativas em porcentagem
+      const novoToken = { id: Date.now(), url: url, x: 45, y: 45, tamanho: 6 };
       const novosTokens = [...tokensNoMapa, novoToken];
       setTokensNoMapa(novosTokens);
       if (documentIdSala) {
@@ -491,6 +464,7 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
     setSalaAtiva(cod);
   };
 
+  // CHAT E ROLAGENS
   const enviarMensagem = async (e) => {
     e.preventDefault();
     if (!textoMsg.trim() || !salaAtiva) return;
@@ -635,6 +609,7 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
             onMouseUp={handleMouseUp}
             onMouseLeave={handleMouseUp}
             onContextMenu={(e) => e.preventDefault()}
+            onWheel={handleWheel}
             style={{ 
               overflow: 'hidden', 
               width: '100%', 
@@ -642,62 +617,75 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
               position: 'relative', 
               border: '1px solid #333',
               cursor: tokenArrastando ? 'move' : arrastando ? 'grabbing' : 'grab',
-              userSelect: 'none'
+              userSelect: 'none',
+              display: 'flex',
+              justifyContent: 'center',
+              alignItems: 'center'
             }}
           >
             <div 
               className="viewport-mapa" 
               style={{ 
-                backgroundImage: mapaFundo ? `url(${mapaFundo})` : 'none', 
-                backgroundSize: 'contain',
-                backgroundRepeat: 'no-repeat',
-                backgroundPosition: 'center',
-                position: 'absolute',
-                width: '100%',
-                height: '100%',
+                position: 'relative',
+                display: 'inline-block',
                 transform: `translate(${posicao.x}px, ${posicao.y}px) scale(${zoomMapa})`,
                 transformOrigin: 'center center',
                 transition: arrastando || tokenArrastando ? 'none' : 'transform 0.1s ease-out'
               }}
             >
-              {!mapaFundo && (
-                <div style={{ display: 'flex', height: '100%', alignItems: 'center', justifyContent: 'center' }}>
+              {!mapaFundo ? (
+                <div style={{ display: 'flex', width: '600px', height: '400px', alignItems: 'center', justifyContent: 'center' }}>
                   <p className="placeholder-mapa">Nenhum mapa carregado. Adicione uma imagem acima!</p>
                 </div>
-              )}
-
-              {tokenArrastando && (
-                <svg 
-                  style={{ 
-                    position: 'absolute', 
-                    top: 0, 
-                    left: 0, 
-                    width: '100%', 
-                    height: '100%', 
-                    pointerEvents: 'none',
-                    zIndex: 20 
+              ) : (
+                <img 
+                  ref={imgMapaRef}
+                  src={mapaFundo} 
+                  alt="Mapa de Fundo" 
+                  draggable={false}
+                  style={{
+                    display: 'block',
+                    maxWidth: '100%',
+                    maxHeight: '100%',
+                    pointerEvents: 'none'
                   }}
-                >
-                  <line 
-                    x1={tokenArrastando.xOrigem + tokenArrastando.tamanho / 2} 
-                    y1={tokenArrastando.yOrigem + tokenArrastando.tamanho / 2} 
-                    x2={tokenArrastando.xAtual + tokenArrastando.tamanho / 2} 
-                    y2={tokenArrastando.yAtual + tokenArrastando.tamanho / 2} 
-                    stroke="#ffffff" 
-                    strokeWidth="3" 
-                    strokeDasharray="4 4"
-                  />
-                  <circle 
-                    cx={tokenArrastando.xOrigem + tokenArrastando.tamanho / 2} 
-                    cy={tokenArrastando.yOrigem + tokenArrastando.tamanho / 2} 
-                    r="4" 
-                    fill="#ffffff" 
-                  />
-                </svg>
+                />
               )}
 
+              {/* Linha Guia do Arraste de Token */}
+              {tokenArrastando && (
+  <svg 
+    style={{ 
+      position: 'absolute', 
+      top: 0, 
+      left: 0, 
+      width: '100%', 
+      height: '100%', 
+      pointerEvents: 'none',
+      zIndex: 20 
+    }}
+  >
+    <line 
+      x1={`${tokenArrastando.xOrigemCentroPct}%`} 
+      y1={`${tokenArrastando.yOrigemCentroPct}%`} 
+      x2={`${tokenArrastando.xAtualCentroPct}%`} 
+      y2={`${tokenArrastando.yAtualCentroPct}%`} 
+      stroke="#ffffff" 
+      strokeWidth="2" 
+      strokeDasharray="4 4"
+    />
+    <circle 
+      cx={`${tokenArrastando.xOrigemCentroPct}%`} 
+      cy={`${tokenArrastando.yOrigemCentroPct}%`} 
+      r="4" 
+      fill="#ffffff" 
+    />
+  </svg>
+)}
+
+              {/* Renderização Sincronizada dos Tokens */}
               {tokensNoMapa.map((token) => {
-                const tamanho = token.tamanho || TAMANHO_CELULA * 2;
+                const tamanho = token.tamanho || 5;
                 const estaSendoArrastado = tokenArrastando?.id === token.id;
 
                 return (
@@ -707,10 +695,10 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
                     onMouseDown={(e) => handleTokenMouseDown(e, token)}
                     style={{ 
                       position: 'absolute', 
-                      left: `${token.x}px`, 
-                      top: `${token.y}px`,
-                      width: `${tamanho}px`,
-                      height: `${tamanho}px`,
+                      left: `${token.x}%`, 
+                      top: `${token.y}%`,
+                      width: `${tamanho}%`,
+                      aspectRatio: '1/1',
                       display: 'inline-block',
                       cursor: 'grab',
                       zIndex: estaSendoArrastado ? 30 : 5
@@ -770,8 +758,8 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
                         zIndex: 10
                       }}
                     >
-                      <button onClick={(e) => alterarTamanhoToken(e, token.id, 10)} title="Aumentar" style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: '2px', cursor: 'pointer', padding: '0 4px', fontSize: '10px' }}>+</button>
-                      <button onClick={(e) => alterarTamanhoToken(e, token.id, -10)} title="Diminuir" style={{ background: '#f59e0b', color: '#fff', border: 'none', borderRadius: '2px', cursor: 'pointer', padding: '0 4px', fontSize: '10px' }}>-</button>
+                      <button onClick={(e) => alterarTamanhoToken(e, token.id, 1)} title="Aumentar" style={{ background: '#10b981', color: '#fff', border: 'none', borderRadius: '2px', cursor: 'pointer', padding: '0 4px', fontSize: '10px' }}>+</button>
+                      <button onClick={(e) => alterarTamanhoToken(e, token.id, -1)} title="Diminuir" style={{ background: '#f59e0b', color: '#fff', border: 'none', borderRadius: '2px', cursor: 'pointer', padding: '0 4px', fontSize: '10px' }}>-</button>
                       <button onClick={(e) => removerTokenDoMapa(e, token.id)} title="Remover" style={{ background: '#ef4444', color: '#fff', border: 'none', borderRadius: '2px', cursor: 'pointer', padding: '0 4px', fontSize: '10px' }}>x</button>
                     </div>
                   </div>
@@ -835,20 +823,14 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
           <div className="painel-chat" onClick={toggleGaveta}>
             <h3>Chat</h3>
             <div className="historico-chat">
-              {mensagens.map((msg, i) => (
-                <div key={msg.$id || i} style={{ marginBottom: '6px' }}>
-                  <strong style={{ color: msg.tipo === 'rolagem' ? '#10b981' : '#00d2ff' }}>{msg.autor}: </strong>
-                  <span>{msg.texto}</span>
+              {mensagens.map((msg, idx) => (
+                <div key={msg.$id || idx} className={`mensagem ${msg.tipo}`}>
+                  <strong>{msg.autor}: </strong><span>{msg.texto}</span>
                 </div>
               ))}
             </div>
-            <form onSubmit={enviarMensagem} className="form-chat">
-              <input 
-                type="text" 
-                placeholder="Digite sua mensagem..." 
-                value={textoMsg}
-                onChange={(e) => setTextoMsg(e.target.value)}
-              />
+            <form onSubmit={enviarMensagem} className="form-chat" onClick={(e) => e.stopPropagation()}>
+              <input type="text" placeholder="Msg..." value={textoMsg} onChange={(e) => setTextoMsg(e.target.value)} />
               <button type="submit">Enviar</button>
             </form>
           </div>
