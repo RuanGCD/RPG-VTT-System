@@ -732,6 +732,8 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
                   draggable={false}
                   style={{
                     display: 'block',
+                    width: 'auto',
+                    height: 'auto',
                     maxWidth: '100%',
                     maxHeight: '100%',
                     pointerEvents: 'none'
