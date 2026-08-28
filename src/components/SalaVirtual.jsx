@@ -88,6 +88,7 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
         if (salaDoc) {
           setDocumentIdSala(salaDoc.$id);
           setMapaFundo(salaDoc.mapa_url || '');
+          setFolhetoEmExibicao(salaDoc.folheto_url || null);
 
           if (salaDoc.tokens) {
             try {
@@ -136,8 +137,12 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
         if (response.channels.some(c => c.includes(documentIdSala))) {
           const payload = response.payload;
 
-          if (payload.mapa_url !== undefined) setMapaFundo(payload.mapa_url);
-
+          if (payload.mapa_url !== undefined) {
+            setMapaFundo(payload.mapa_url);
+          }
+          if (payload.folheto_url !== undefined) {
+             setFolhetoEmExibicao(payload.folheto_url || null);
+          }
           if (payload.tokens !== undefined) {
             try {
               const novosTokens = JSON.parse(payload.tokens);
@@ -492,7 +497,13 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
       }
     } else if (abaRecursos === 'folhetos') {
       setFolhetoEmExibicao(url);
-    }
+
+      if (documentIdSala) {
+      await atualizarEstadoDaSala(documentIdSala, {
+      folheto_url: url
+    });
+  }
+}
   };
 
   const excluirSala = async (cod) => {
@@ -586,6 +597,15 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
 
     await enviarMensagemNoBanco(mensagemRolagem);
   };
+  const fecharFolheto = async () => {
+  setFolhetoEmExibicao(null);
+
+  if (documentIdSala) {
+    await atualizarEstadoDaSala(documentIdSala, {
+      folheto_url: null
+    });
+  }
+};
 
   if (!salaAtiva) {
     return (
@@ -665,7 +685,7 @@ function SalaVirtual({ usuario, salaAtiva, setSalaAtiva }) {
       </header>
 
       {folhetoEmExibicao && (
-        <div className="modal-folheto" onClick={() => setFolhetoEmExibicao(null)}>
+        <div className="modal-folheto" onClick={fecharFolheto}>
           <div className="conteudo-modal">
             <img src={folhetoEmExibicao} alt="Folheto Ampliado" />
             <p>Clique para fechar</p>

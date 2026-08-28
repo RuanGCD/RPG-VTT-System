@@ -360,7 +360,7 @@ function App() {
 
           <section className="ficha" ref={fichaRef}>
             <section className='Topo'>
-              <h1> Blue Lock: <strong>Egoist</strong> Character</h1>
+              <h1> Blue Locker: <strong>Personagem</strong></h1>
               <div className='conteudo'>
                 <div className='esquerda'>
                   <div className='campo'>
